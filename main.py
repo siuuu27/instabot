@@ -3,7 +3,7 @@ import instaloader
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 
-TOKEN = "7554272410:AAEWpVxB9z7MX0_HAhX8MCwrgkv8AkIqbdM"
+TOKEN = "7554272410:AAGF2nKQ89C5OU3ePo86yGduj2ZVumZKpMQ"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
