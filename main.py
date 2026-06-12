@@ -1,9 +1,12 @@
 import os
-import instaloader
+import requests
+import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 
 TOKEN = os.environ.get("TOKEN")
+RAPIDAPI_KEY = "2576f146a5mshc340d75d2142a7ep1bca04jsn70ab9fb10ae7"
+RAPIDAPI_HOST = "instagram-scraper-stable-api.p.rapidapi.com"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -14,33 +17,33 @@ async def download_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.message.text.strip().replace("@", "")
     await update.message.reply_text(f"⏳ Завантажую відео з @{username}...")
 
-    L = instaloader.Instaloader(
-        download_pictures=False,
-        download_video_thumbnails=False,
-        save_metadata=False,
-        post_metadata_txt_pattern="",
-        user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"
-    )
-
     try:
-        profile = instaloader.Profile.from_username(L.context, username)
-        os.makedirs(f"downloads/{username}", exist_ok=True)
-        count = 0
+        headers = {
+            "x-rapidapi-key": RAPIDAPI_KEY,
+            "x-rapidapi-host": RAPIDAPI_HOST,
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = {
+            "username_or_url": f"https://www.instagram.com/{username}/",
+            "data": "posts",
+            "amount": "10"
+        }
+        response = requests.post(
+            f"https://{RAPIDAPI_HOST}/get_ig_user_posts_v2.php",
+            headers=headers,
+            data=data
+        )
+        posts = response.json()
 
-        for post in profile.get_posts():
-            if post.is_video:
-                L.download_post(post, target=f"downloads/{username}")
-                count += 1
-                if count >= 10:
-                    break
-
-        folder = f"downloads/{username}"
         sent = 0
-        for file in os.listdir(folder):
-            if file.endswith(".mp4"):
-                with open(f"{folder}/{file}", "rb") as video:
-                    await update.message.reply_video(video)
-                    sent += 1
+        for post in posts.get("posts", []):
+            if post.get("is_video") and post.get("video_url"):
+                video_url = post["video_url"]
+                video_data = requests.get(video_url).content
+                await update.message.reply_video(video_data)
+                sent += 1
+                if sent >= 10:
+                    break
 
         if sent == 0:
             await update.message.reply_text("❌ Відео не знайдено або акаунт приватний")
