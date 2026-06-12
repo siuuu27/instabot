@@ -3,7 +3,7 @@ import instaloader
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 
-TOKEN = "7554272410:AAGF2nKQ89C5OU3ePo86yGduj2ZVumZKpMQ
+TOKEN = "7554272410:AAGF2nKQ89C50U3ePo86yGduj2ZVumZKpMQ"
 
 INST_LOGIN = "giraffe.5869205"
 INST_PASSWORD = "Zasdf1234"
