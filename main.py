@@ -3,7 +3,10 @@ import instaloader
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 
-TOKEN = "7554272410:AAGF2nKQ89C5OU3ePo86yGduj2ZVumZKpMQ"
+TOKEN = "7554272410:AAGF2nKQ89C5OU3ePo86yGduj2ZVumZKpMQ
+
+INST_LOGIN = "giraffe.5869205"
+INST_PASSWORD = "Zasdf1234"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -22,6 +25,7 @@ async def download_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
+        L.login(INST_LOGIN, INST_PASSWORD)
         profile = instaloader.Profile.from_username(L.context, username)
         os.makedirs(f"downloads/{username}", exist_ok=True)
         count = 0
