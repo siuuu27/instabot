@@ -31,8 +31,24 @@ async def download_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data=data
         )
         result = response.json()
-        # Показуємо що повертає API
-        await update.message.reply_text(f"Відповідь API: {str(result)[:1000]}")
+        posts = result.get("posts", [])
+
+        sent = 0
+        for post in posts:
+            node = post.get("node", {})
+            video_versions = node.get("video_versions", [])
+            if video_versions:
+                video_url = video_versions[0]["url"]
+                video_data = requests.get(video_url).content
+                await update.message.reply_video(video_data)
+                sent += 1
+                if sent >= 10:
+                    break
+
+        if sent == 0:
+            await update.message.reply_text("❌ Відео не знайдено або акаунт приватний")
+        else:
+            await update.message.reply_text(f"✅ Готово! Надіслано {sent} відео!")
 
     except Exception as e:
         await update.message.reply_text(f"❌ Помилка: {str(e)}")
