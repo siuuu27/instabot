@@ -31,23 +31,8 @@ async def download_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data=data
         )
         result = response.json()
-        posts = result.get("data", {}).get("user", {}).get("edge_owner_to_timeline_media", {}).get("edges", [])
-
-        sent = 0
-        for edge in posts:
-            node = edge.get("node", {})
-            if node.get("is_video") and node.get("video_url"):
-                video_url = node["video_url"]
-                video_data = requests.get(video_url).content
-                await update.message.reply_video(video_data)
-                sent += 1
-                if sent >= 10:
-                    break
-
-        if sent == 0:
-            await update.message.reply_text("❌ Відео не знайдено або акаунт приватний")
-        else:
-            await update.message.reply_text(f"✅ Готово! Надіслано {sent} відео!")
+        # Показуємо що повертає API
+        await update.message.reply_text(f"Відповідь API: {str(result)[:1000]}")
 
     except Exception as e:
         await update.message.reply_text(f"❌ Помилка: {str(e)}")
