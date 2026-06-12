@@ -14,13 +14,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Привіт! 👋\nНадішли юзернейм Instagram (без @)\nНаприклад: cristiano"
     )
 
-async def get_posts(username):
+async def get_posts(username, pagination_token=None):
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": RAPIDAPI_HOST,
         "Content-Type": "application/x-www-form-urlencoded"
     }
     data = {"username_or_url": f"https://www.instagram.com/{username}/"}
+    if pagination_token:
+        data["pagination_token"] = pagination_token
+
     response = requests.post(
         f"https://{RAPIDAPI_HOST}/get_ig_user_posts.php",
         headers=headers,
@@ -28,34 +31,51 @@ async def get_posts(username):
     )
     result = response.json()
     posts = result.get("posts", [])
+    next_token = result.get("pagination_token", None)
+
     videos = []
     for post in posts:
         node = post.get("node", {})
         video_versions = node.get("video_versions", [])
         if video_versions:
             videos.append(video_versions[0]["url"])
-    return videos
 
-async def send_videos(update, context, username, start_index):
-    chat_id = update.effective_chat.id
-    all_videos = user_data.get(chat_id, {}).get("videos", [])
+    return videos, next_token
 
-    batch = all_videos[start_index:start_index + 10]
+async def send_videos(chat_id, context, update=None):
+    data = user_data.get(chat_id, {})
+    videos = data.get("videos", [])
+    index = data.get("index", 0)
+
+    batch = videos[index:index + 10]
+
+    if not batch:
+        # Спробуємо завантажити ще
+        username = data.get("username")
+        pagination_token = data.get("pagination_token")
+        if pagination_token:
+            new_videos, new_token = await get_posts(username, pagination_token)
+            user_data[chat_id]["videos"].extend(new_videos)
+            user_data[chat_id]["pagination_token"] = new_token
+            batch = user_data[chat_id]["videos"][index:index + 10]
+
+    if not batch:
+        await context.bot.send_message(chat_id=chat_id, text="✅ Всі відео надіслано!")
+        return
+
     sent = 0
     for url in batch:
         video_data = requests.get(url).content
         await context.bot.send_video(chat_id=chat_id, video=video_data)
         sent += 1
 
-    new_index = start_index + sent
-    user_data[chat_id]["index"] = new_index
+    user_data[chat_id]["index"] = index + sent
+    total = len(user_data[chat_id]["videos"])
+    new_index = user_data[chat_id]["index"]
+    has_more = user_data[chat_id].get("pagination_token") or new_index < total
 
-    if sent == 0:
-        await context.bot.send_message(chat_id=chat_id, text="❌ Більше відео немає!")
-        return
-
-    if new_index < len(all_videos):
-        keyboard = [[InlineKeyboardButton(f"Наступні 10 ▶️ (залишилось {len(all_videos) - new_index})", callback_data="next")]]
+    if has_more:
+        keyboard = [[InlineKeyboardButton(f"Наступні 10 ▶️", callback_data="next")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(chat_id=chat_id, text=f"✅ Надіслано {sent} відео!", reply_markup=reply_markup)
     else:
@@ -67,14 +87,19 @@ async def download_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"⏳ Завантажую відео з @{username}...")
 
     try:
-        videos = await get_posts(username)
+        videos, pagination_token = await get_posts(username)
         if not videos:
             await update.message.reply_text("❌ Відео не знайдено або акаунт приватний")
             return
 
-        user_data[chat_id] = {"videos": videos, "index": 0, "username": username}
-        await update.message.reply_text(f"📊 Знайдено {len(videos)} відео. Надсилаю перші 10...")
-        await send_videos(update, context, username, 0)
+        user_data[chat_id] = {
+            "videos": videos,
+            "index": 0,
+            "username": username,
+            "pagination_token": pagination_token
+        }
+        await update.message.reply_text(f"📊 Знайдено {len(videos)}+ відео. Надсилаю перші 10...")
+        await send_videos(chat_id, context, update)
 
     except Exception as e:
         await update.message.reply_text(f"❌ Помилка: {str(e)}")
@@ -83,11 +108,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     chat_id = query.message.chat_id
-    data = user_data.get(chat_id, {})
-    username = data.get("username", "")
-    index = data.get("index", 0)
-    await query.edit_message_text(f"⏳ Надсилаю наступні відео...")
-    await send_videos(update, context, username, index)
+    await query.edit_message_text("⏳ Надсилаю наступні відео...")
+    await send_videos(chat_id, context)
 
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
