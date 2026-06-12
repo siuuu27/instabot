@@ -1,6 +1,5 @@
 import os
 import requests
-import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 
@@ -24,21 +23,21 @@ async def download_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Content-Type": "application/x-www-form-urlencoded"
         }
         data = {
-            "username_or_url": f"https://www.instagram.com/{username}/",
-            "data": "posts",
-            "amount": "10"
+            "username_or_url": f"https://www.instagram.com/{username}/"
         }
         response = requests.post(
-            f"https://{RAPIDAPI_HOST}/get_ig_user_posts_v2.php",
+            f"https://{RAPIDAPI_HOST}/get_ig_user_posts.php",
             headers=headers,
             data=data
         )
-        posts = response.json()
+        result = response.json()
+        posts = result.get("data", {}).get("user", {}).get("edge_owner_to_timeline_media", {}).get("edges", [])
 
         sent = 0
-        for post in posts.get("posts", []):
-            if post.get("is_video") and post.get("video_url"):
-                video_url = post["video_url"]
+        for edge in posts:
+            node = edge.get("node", {})
+            if node.get("is_video") and node.get("video_url"):
+                video_url = node["video_url"]
                 video_data = requests.get(video_url).content
                 await update.message.reply_video(video_data)
                 sent += 1
